@@ -12,25 +12,29 @@ void nano_wait(unsigned int n) {
 #define ONE (38)
 #define ZERO (19)
 #define RS (0)
-#define NUMLED (10)
+#define NUMLED (64)
+#define LED_ARR_SIZE (24*NUMLED + 200)
 int count = 0;
 
-uint16_t off[24] = {19,19,19,19,19,19,19,19,
+//BUFFER AT END FOR OFF CYCLE
+uint8_t leds[LED_ARR_SIZE] = {0};
+
+uint8_t off[24] = {19,19,19,19,19,19,19,19,
 				  19,19,19,19,19,19,19,19,
 				  19,19,19,19,19,19,19,19};
-uint16_t red[24] = {19,19,19,19,19,19,19,19,
-					38,38,38,38,38,38,38,38,
+uint8_t red[24] = {19,19,19,19,19,19,19,19,
+					19,19,19,19,38,38,38,38,
 					19,19,19,19,19,19,19,19};
-uint16_t green[24] = {38,38,38,38,38,38,38,38,
+uint8_t green[24] = {19,19,19,19,38,38,38,38,
 				  	  19,19,19,19,19,19,19,19,
 					  19,19,19,19,19,19,19,19};
-uint16_t blue[24] = { 19,19,19,19,19,19,19,19,
+uint8_t blue[24] = { 19,19,19,19,19,19,19,19,
 				  	  19,19,19,19,19,19,19,19,
-					  38,38,38,38,38,38,38,38};
-uint16_t white[24] = {38,38,38,38,38,38,38,38,
+					  19,19,19,19,38,38,38,38};
+uint8_t white[24] = {38,38,38,38,38,38,38,38,
 						38,38,38,38,38,38,38,38,
 						38,38,38,38,38,38,38,38};
-uint16_t reset[24] = {RS, RS, RS, RS, RS, RS, RS, RS,
+uint8_t reset[24] = {RS, RS, RS, RS, RS, RS, RS, RS,
 						RS, RS, RS, RS, RS, RS, RS, RS,
 						RS, RS, RS, RS, RS, RS, RS, RS};
 
@@ -55,26 +59,28 @@ void init_tim1_dma(void){
 
     TIM1->CCMR1 &= ~TIM_CCMR1_OC1M;
     //TIM1->CCMR1 |= TIM_CCMR1_OC1PE;
-    TIM1->CCMR1 |= (TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1);
-    TIM1->CCER |= TIM_CCER_CC1E;// | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E);
+    TIM1->CCMR1 |= (TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1PE);
+    TIM1->CCER |= TIM_CCER_CC1E;
 
 
 
     //DMA CONF
     RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 
+    DMA1_Channel2->CCR &= ~DMA_CCR_EN;
     DMA1_Channel2->CPAR = (uint32_t) (&(TIM1->CCR1)); /* (3) */
-    DMA1_Channel2->CMAR = (uint32_t)(blue); /* (4) */
-    DMA1_Channel2->CNDTR =  (uint16_t) 24; /* (5) */
-    DMA1_Channel2->CCR |= DMA_CCR_MINC | DMA_CCR_MSIZE_0 | DMA_CCR_PSIZE_0 | DMA_CCR_TEIE | DMA_CCR_TCIE ; /* (6) */
+    DMA1_Channel2->CMAR = (uint32_t)(leds); /* (4) */
+    DMA1_Channel2->CNDTR =  (uint16_t) LED_ARR_SIZE; /* (5) */
+    DMA1_Channel2->CCR |= DMA_CCR_MINC | DMA_CCR_PSIZE_0 | DMA_CCR_TEIE | DMA_CCR_TCIE ; /* (6) */
     DMA1_Channel2->CCR |= DMA_CCR_DIR | DMA_CCR_CIRC;
-    DMA1_Channel2->CCR |= DMA_CCR_EN; /* (7) */
+    //DMA1_Channel2->CCR |= DMA_CCR_EN; /* (7) */
+
     //DMACSELR &= ~(0xf0);
     /* Configure NVIC for DMA */
     /* (1) Enable Interrupt on DMA Channel 1 */
     /* (2) Set priority for DMA Channel 1 */
-    NVIC_EnableIRQ(DMA1_Ch2_3_DMA2_Ch1_2_IRQn); /* (1) */
-    NVIC_SetPriority(DMA1_Ch2_3_DMA2_Ch1_2_IRQn,0); /* (2) */
+    //NVIC_EnableIRQ(DMA1_Ch2_3_DMA2_Ch1_2_IRQn); /* (1) */
+    //NVIC_SetPriority(DMA1_Ch2_3_DMA2_Ch1_2_IRQn,0); /* (2) */
 
     TIM1->CR1 |= TIM_CR1_CEN;
     return;
@@ -83,39 +89,11 @@ void init_tim1_dma(void){
 
 void DMA1_CH2_3_DMA2_CH1_2_IRQHandler(void){
 
-	///if(count >= NUMLED){
-		//TIM1->CR1 &= ~TIM_CR1_CEN;
-		//DMA1_Channel2->CCR &= ~DMA_CCR_EN;
-		//TIM1->CCR1 = 0;
-		//nano_wait(600000);
-		//TIM1->CR1 |= TIM_CR1_CEN;
-	if(DMA1->ISR & DMA_ISR_TCIF2){
+	//if(DMA1->ISR & DMA_ISR_TCIF2){
 
-
-		//for(byte in buffer):
-		//		convert byte to ONEs and ZEROs
-		//
-
-
-		if(count < 100){
-			DMA1_Channel2->CMAR = (uint32_t) reset;
-			count++;
-		}else if(count < 2000){
-			DMA1_Channel2->CMAR = (uint32_t) blue;
-			count++;
-		}else if(count < 2100){
-			DMA1_Channel2->CMAR = (uint32_t) reset;
-			count++;
-		}else if(count < 4000){
-			DMA1_Channel2->CMAR = (uint32_t) red;
-			count++;
-		} else {
-			count = 0;
-		}
-
-	}
-
-		DMA1->IFCR |= 0xf0;
+	//DMA1_Channel2->CCR &= ~DMA_CCR_EN;
+	//TIM1->CCR1 = 0;
+	DMA1->IFCR |= 0xf0;
 
 		//DMA1_Channel2->CCR |= DMA_CCR_EN;
 		//count = 0;
@@ -123,43 +101,59 @@ void DMA1_CH2_3_DMA2_CH1_2_IRQHandler(void){
 
 }
 
+void LED_write(uint8_t *leds){
+	//enable DMA to transfer array (noncircular)
+	DMA1_Channel2->CCR &= ~DMA_CCR_EN;
+	DMA1_Channel2->CMAR = (uint32_t) leds;
+	DMA1_Channel2->CCR |= DMA_CCR_EN;
+
+
+	return;
+}
+
+void LED_alternate(uint8_t *leds, uint8_t *col1, uint8_t *col2){
+	DMA1_Channel2->CCR &= ~DMA_CCR_EN;
+
+	for(int i = 0; i < NUMLED; i++)
+	{
+		for(int j = 0; j < 24; j++){
+			if(i % 2)
+				leds[i*24 + j] = col1[j];
+			else
+				leds[i*24 + j] = col2[j];
+		}
+	}
+	DMA1_Channel2->CCR |= DMA_CCR_EN;
+
+}
 
 int main(void)
 {
-
-
 	init_tim1_dma();
 
-	int st = 0;
+   	//LED_write(leds);
+   	//LED_alternate(leds, green, green);
+	//LED_write(leds);
+
+
+
+   	int count = 0;
     while(1){
 
-    	//while(~DMA->ISR & DMA_ISR_TCIC){
+    	if(count == 0){
+    	  	LED_alternate(leds, green, red);
 
-/*
-		TIM1->CR1 &= ~TIM_CR1_CEN;
-		DMA1_Channel2->CCR &= ~DMA_CCR_EN;
-    	//do color stuff here
-    	if(st == 0){
-        	memcpy(buf, red, 24);
-        	st++;
-    	}if(st == 1){
-        	memcpy(buf, green, 24);
-        	st++;
-        }if(st == 2){
-        	memcpy(buf, green, 24);
-			st++;
-        }if(st == 3){
-        	memcpy(buf, reset, 24);
-        	st = 0;
-        }
+    	   	//LED_write(leds);
+    	   	//LED_alternate(leds, off, green);
+    	   	//LED_alternate(leds, red, blue);
 
-        nano_wait(500000);
-		TIM1->CR1 |= TIM_CR1_CEN;
-		DMA1_Channel2->CCR |= DMA_CCR_EN;
-*/
-	}
+    	}else if(count == 100000){
+    	   	LED_alternate(leds, red, blue);
+
+    	} else if(count > 200000) {
+    		count = -1;
+    	}
+    	count++;
+
+ 	}
 }
-
-
-
-
