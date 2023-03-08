@@ -4,6 +4,7 @@ from time import sleep_ms
 import ubluetooth
 
 message = ""
+buffer = 0
 
 class ESP32_BLE():
     def __init__(self, name):
@@ -19,6 +20,7 @@ class ESP32_BLE():
         self.disconnected()
         self.ble.irq(self.ble_irq)
         self.register()
+        self.ble.gatts_set_buffer(self.rx, 3*64*2) #hardcode 2 displays for now
         self.advertiser()
 
     def connected(self):
@@ -43,7 +45,9 @@ class ESP32_BLE():
         elif event == 3: #_IRQ_GATTS_WRITE:
                          # A client has written to this characteristic or descriptor.          
             buffer = self.ble.gatts_read(self.rx)
-            message = buffer.decode('UTF-8').strip()
+            print(buffer)
+            message = [buffer[i:i + 3] for i in range(0, len(buffer), 3)]
+            dataarr = message
             print(message)
             
     def register(self):        
@@ -84,7 +88,7 @@ class ESP32_BLE():
 
 #led = Pin(13, Pin.OUT)
 but = Pin(0, Pin.IN)
-ble = ESP32_BLE("ESP32_test")
+ble = ESP32_BLE("LED Controller")
 
 def buttons_irq(pin):
     led.value(not led.value())
