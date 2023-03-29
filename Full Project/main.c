@@ -21,7 +21,7 @@
 #define ZERO (19)
 #define RS (0)
 #define NUMLED (64)
-#define LED_ARR_SIZE (24*NUMLED + 200)
+#define LED_ARR_SIZE 24*NUMLED
 #define WifiCommBuffSIZE 200
 char wifiCommunicationBuffer[WifiCommBuffSIZE];
 int count = 0;
@@ -35,7 +35,7 @@ void nano_wait(unsigned int n) {
 
 
 //BUFFER AT END FOR OFF CYCLE
-uint8_t leds[LED_ARR_SIZE] = {0};
+uint8_t leds[LED_ARR_SIZE + 200] = {0};
 
 uint8_t off[24] = {19,19,19,19,19,19,19,19,
 				  19,19,19,19,19,19,19,19,
@@ -146,6 +146,37 @@ void LED_alternate(uint8_t *leds, uint8_t *col1, uint8_t *col2){
 
 }
 
+void init_timer6(void) {
+    RCC->APB1ENR |= RCC_APB1ENR_TIM6EN; // Enable Timer6 clock
+
+    TIM6->PSC = 480000 - 1; // Set prescaler to generate 10ms tick
+    TIM6->ARR = 10 - 1; // Auto-reload value to generate 10ms interrupt
+    TIM6->DIER |= TIM_DIER_UIE; // Enable update interrupt
+    NVIC_EnableIRQ(TIM6_DAC_IRQn); // Enable Timer6 interrupt in NVIC
+    TIM6->CR1 |= TIM_CR1_CEN; // Enable Timer6 counter
+}
+
+void TIM6IRQ(void){
+  // if(strstr())
+  char current;
+  {
+    for(int i = 0; i < 3 * NUMLED; i++){ //add offset to buf
+      current = wifiCommunicationBuffer[i];
+      for(int j = 0; j < 8; j++){
+        if(current & 1 << j){
+          leds[i * 8 + j] = 38;
+        }
+        else{
+          leds[i * 8 + j] = 19;
+        }
+      }
+      
+    }
+  } 
+  clear_buf();
+  
+}
+
 //////////////////////////////////////////////////
 
 int main(void)
@@ -161,6 +192,7 @@ int main(void)
 
   	LED_alternate(leds, off, off);
     init_tim1_dma();
+    init_tim6();
 
 
 
