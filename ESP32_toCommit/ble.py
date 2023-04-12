@@ -1,31 +1,54 @@
+# This example demonstrates a UART periperhal.
 from machine import Pin, Timer
-import ubluetooth
+
+import bluetooth
+import random
+import struct
+import time
+from payload import advertising_payload
+
+from micropython import const
+
+_IRQ_CENTRAL_CONNECT = const(1)
+_IRQ_CENTRAL_DISCONNECT = const(2)
+_IRQ_GATTS_WRITE = const(3)
+
+_FLAG_READ = const(0x0002)
+_FLAG_WRITE_NO_RESPONSE = const(0x0004)
+_FLAG_WRITE = const(0x0008)
+_FLAG_NOTIFY = const(0x0010)
+
+_UART_UUID = bluetooth.UUID("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
+_UART_TX = (
+    bluetooth.UUID("6E400003-B5A3-F393-E0A9-E50E24DCCA9E"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_UART_RX = (
+    bluetooth.UUID("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"),
+    _FLAG_WRITE | _FLAG_WRITE_NO_RESPONSE,
+)
+_UART_SERVICE = (
+    _UART_UUID,
+    (_UART_TX, _UART_RX),
+)
 
 
-message = ""
-#buffer = 0
-
-class ESP32_BLE():
-    def __init__(self, name, WiFi):
-        # Create internal objects for the onboard LED
-        # blinking when no BLE device is connected
-        # stable ON when connected
-        
-        
-        self.WiFi = WiFi
-        
-        
+class ESP32_BLE:
+    def __init__(self, ble, name="E2"):
+        self._ble = ble
+        self._ble.active(True)
+        self._ble.irq(self._irq)
+        ((self._handle_tx, self._handle_rx),) = self._ble.gatts_register_services((_UART_SERVICE,))
+        print("PRINT: ", self._ble.gatts_set_buffer(self._handle_rx, 384, False))
+        self._connections = set()
+        self._write_callback = None
+        #self._ble.config(rxbuf=)
+        self._payload = advertising_payload(name=name, services=[_UART_UUID])
+        self._advertise()
+        print(self._handle_rx)        
         self.led = Pin(13, Pin.OUT)
         self.timer1 = Timer(0)
-        
-        self.name = name
-        self.ble = ubluetooth.BLE()
-        self.ble.active(True)
-        self.disconnected()
-        self.ble.irq(self.ble_irq)
-        self.register()
-        self.ble.gatts_set_buffer(self.rx, 3*64*2) #hardcode 2 displays for now
-        self.advertiser()
+        #print("BUFF SIZE", self._ble.config('rxbuf'))
 
     def connected(self):
         self.led.value(1)
@@ -34,50 +57,66 @@ class ESP32_BLE():
     def disconnected(self):        
         self.timer1.init(period=100, mode=Timer.PERIODIC, callback=lambda t: self.led.value(not self.led.value()))
 
-    def ble_irq(self, event, data):
-        global message
-        
-        if event == 1: #_IRQ_CENTRAL_CONNECT:
-                       # A central has connected to this peripheral
+    def _irq(self, event, data):
+        # Track connections so we can send notifications.
+        if event == _IRQ_CENTRAL_CONNECT:
+            conn_handle, _, _ = data
+            print("New connection", conn_handle)
+            self._connections.add(conn_handle)
             self.connected()
-
-        elif event == 2: #_IRQ_CENTRAL_DISCONNECT:
-                         # A central has disconnected from this peripheral.
-            self.advertiser()
+            
+        elif event == _IRQ_CENTRAL_DISCONNECT:
+            conn_handle, _, _ = data
+            print("Disconnected", conn_handle)
+            self._connections.remove(conn_handle)
             self.disconnected()
-        
-        elif event == 3: #_IRQ_GATTS_WRITE:
-                         # A client has written to this characteristic or descriptor.  
-        
-            buffer = self.ble.gatts_read(self.rx)
-            print(buffer)
-            message = [buffer[i:i + 3] for i in range(0, len(buffer), 3)]
-            dataarr = message
-            print(message)
-            self.WiFi.s.sendto(bytes(str(message), "utf-8"), ("192.168.4.2", 80))
-
-            
-    def register(self):        
-        # Nordic UART Service (NUS)
-        NUS_UUID = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E'
-        RX_UUID = '6E400002-B5A3-F393-E0A9-E50E24DCCA9E'
-        TX_UUID = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E'
-            
-        BLE_NUS = ubluetooth.UUID(NUS_UUID)
-        BLE_RX = (ubluetooth.UUID(RX_UUID), ubluetooth.FLAG_WRITE)
-        BLE_TX = (ubluetooth.UUID(TX_UUID), ubluetooth.FLAG_NOTIFY)
-            
-        BLE_UART = (BLE_NUS, (BLE_TX, BLE_RX,))
-        SERVICES = (BLE_UART, )
-        ((self.tx, self.rx,), ) = self.ble.gatts_register_services(SERVICES)
-
+            # Start advertising again to allow a new connection.
+            self._advertise()
+        elif event == _IRQ_GATTS_WRITE:
+            conn_handle, value_handle = data
+            print(data)
+            value = self._ble.gatts_read(value_handle)
+            if value_handle == self._handle_rx and self._write_callback:
+                self._write_callback(value)
+                
     def send(self, data):
-        self.ble.gatts_notify(0, self.tx, data + '\n')
+        for conn_handle in self._connections:
+            self._ble.gatts_notify(conn_handle, self._handle_tx, data)
 
-    def advertiser(self):
-        name = bytes(self.name, 'UTF-8')
-        adv_data = bytearray('\x02\x01\x02') + bytearray((len(name) + 1, 0x09)) + name
-        self.ble.gap_advertise(100, adv_data)
-        print(adv_data)
-        print("\r\n")
+    def is_connected(self):
+        return len(self._connections) > 0
 
+    def _advertise(self, interval_us=500000):
+        print("Starting advertising")
+        self._ble.gap_advertise(interval_us, adv_data=self._payload)
+
+    def on_write(self, callback):
+        self._write_callback = callback
+
+    def on_rx(v):
+        print(v)
+
+        
+def demo():
+    ble = bluetooth.BLE()
+    p = ESP32_BLE(ble)
+
+    def on_rx(v):
+        print("RX", v)
+
+    p.on_write(on_rx)
+
+    i = 0
+    while True:
+        #if p.is_connected():
+            # Short burst of queued notifications.
+            #for _ in range(3):
+            #    data = str(i) + "_"
+            #    print("TX", data)
+            #    p.send(data)
+            #    i += 1
+        time.sleep_ms(100)
+
+
+if __name__ == "__main__":
+    demo()
