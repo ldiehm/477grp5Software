@@ -121,6 +121,7 @@ void configureWifiSystem(void){
 	clear_buf(wifiCommunicationBuffer, 200);
 	configureUDP("0.0.0.0");
 	while(!strstr(wifiCommunicationBuffer, "OK") && !strstr(wifiCommunicationBuffer, "ERROR"));
+	clear_buf(wifiCommunicationBuffer, 200);
 }
 
 void configureUDP(char * IP){
@@ -135,9 +136,15 @@ void configureUDP(char * IP){
 }
 
 void clear_buf(char *buf, int size){
+
+	DMA2_Channel2->CCR &= ~DMA_CCR_EN;
+
 	for(int i = 0; i < size; i++){
 		buf[i] = 1;
 	}
+
+    DMA2_Channel2->CNDTR = WifiCommBuffSIZE;
+	DMA2_Channel2->CCR |= DMA_CCR_EN;
 }
 
 
