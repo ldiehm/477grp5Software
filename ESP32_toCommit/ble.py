@@ -34,18 +34,17 @@ _UART_SERVICE = (
 
 
 class ESP32_BLE:
-    def __init__(self, ble, name="E2"):
+    def __init__(self, wifi, ble, name="E2"):
         self._ble = ble
+        self._wifi= wifi
         self._ble.active(True)
         self._ble.irq(self._irq)
         ((self._handle_tx, self._handle_rx),) = self._ble.gatts_register_services((_UART_SERVICE,))
-        print("PRINT: ", self._ble.gatts_set_buffer(self._handle_rx, 384, False))
         self._connections = set()
         self._write_callback = None
         #self._ble.config(rxbuf=)
         self._payload = advertising_payload(name=name, services=[_UART_UUID])
-        self._advertise()
-        print(self._handle_rx)        
+        self._advertise()       
         self.led = Pin(13, Pin.OUT)
         self.timer1 = Timer(0)
         #print("BUFF SIZE", self._ble.config('rxbuf'))
@@ -74,10 +73,9 @@ class ESP32_BLE:
             self._advertise()
         elif event == _IRQ_GATTS_WRITE:
             conn_handle, value_handle = data
-            print(data)
             value = self._ble.gatts_read(value_handle)
             if value_handle == self._handle_rx and self._write_callback:
-                self._write_callback(value)
+                self._write_callback(value, self._wifi)
                 
     def send(self, data):
         for conn_handle in self._connections:
@@ -92,9 +90,6 @@ class ESP32_BLE:
 
     def on_write(self, callback):
         self._write_callback = callback
-
-    def on_rx(v):
-        print(v)
 
         
 def demo():
