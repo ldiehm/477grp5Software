@@ -11,9 +11,9 @@
 #define RS (0)
 #define NUMLED (64)
 #define LED_ARR_SIZE (24*NUMLED + 200)
-#define WifiCommBuffSIZE 200
+#define WifiCommBuffSIZE (250)
 
-char wifiCommunicationBuffer[WifiCommBuffSIZE];
+volatile char wifiCommunicationBuffer[WifiCommBuffSIZE];
 int count = 0;
 
 void nano_wait(unsigned int n) {
@@ -41,32 +41,38 @@ RS, RS, RS, RS, RS, RS, RS, RS };
 
 void init_clock(void) {
 
-	if ((RCC->CFGR & RCC_CFGR_SWS) == RCC_CFGR_SWS_PLL) /* (1) */
-	{
-		RCC->CFGR &= (uint32_t) (~RCC_CFGR_SW); /* (2) */
-		while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI) /* (3) */
-		{
-			/* For robust implementation, add here time-out management */
-		}
-	}
-	RCC->CR &= (uint32_t) (~RCC_CR_PLLON);/* (4) */
-	while ((RCC->CR & RCC_CR_PLLRDY) != 0) /* (5) */
-	{
-		/* For robust implementation, add here time-out management */
-	}
 
-	RCC->CFGR = (RCC->CFGR & (~RCC_CFGR_PLLMUL)) | (RCC_CFGR_PLLMUL12);
+
+//	CRS->CR &= ~CRS_CR_CEN;
+//	CRS->CFGR |= CRS_CFGR_SYNCSRC_0;
+//	CRS->CR |= CRS_CR_CEN;
+
+//	 (++) Modify the CPU clock source, using "RCC_SYSCLKConfig()" function
+//	         (++) If needed, modify the CPU clock prescaler by using "RCC_HCLKConfig()" function
+//	         (++) Check that the new CPU clock source is taken into account by reading
+//	              the clock source status, using "RCC_GetSYSCLKSource()" function
+
+	RCC_HCLKConfig(0); //Clear all bits of HPRE
+//	   pllmull = RCC->CFGR & RCC_CFGR_PLLMULL;
+//	      pllsource = RCC->CFGR & RCC_CFGR_PLLSRC;
+//	      pllmull = ( pllmull >> 18) + 2;
+
+	RCC->CFGR |= RCC_CFGR_PLLMUL6;
+	RCC->CFGR2 &= ~0xF; // Clears lowest 4 bits of CFGR2 (PREDIV)
+	RCC->CFGR |= RCC_CFGR_PLLSRC_0;
 	RCC->CR |= RCC_CR_PLLON;
 
-	while ((RCC->CR & RCC_CR_PLLRDY) == 0) /* (8) */
-	{
-		/* For robust implementation, add here time-out management */
-	}
-	RCC->CFGR |= (uint32_t) (RCC_CFGR_SW_PLL); /* (9) */
-	while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) /* (10) */
-	{
-		/* For robust implementation, add here time-out management */
-	}
+
+
+	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+	uint8_t clksrc = RCC_GetSYSCLKSource();
+	//RCC_ClocksTypeDef * clk;
+	//RCC_GetClocksFreq(clk); <- this infinite loops
+
+
+//	RCC_PLLConfig(RCC_PLLSource_HSI, RCC_CFGR_PLLMUL_2);
+
+	return;
 
 }
 
@@ -158,40 +164,19 @@ void LED_alternate(uint8_t *leds, uint8_t *col1, uint8_t *col2) {
 
 }
 
-void init_tim7(void) {
-
-	RCC->APB1ENR |= RCC_APB1ENR_TIM7EN; // Enable Timer6 clock
-	TIM7->PSC = 480000 - 1; // Set prescaler to generate 10ms tick
-	TIM7->ARR = 10 - 1; // Auto-reload value to generate 10ms interrupt
-	TIM7->DIER |= TIM_DIER_UIE; // Enable update interrupt
-	NVIC_EnableIRQ(TIM7_IRQn); // Enable Timer7 interrupt in NVIC
-	TIM7->CR1 |= TIM_CR1_CEN; // Enable Timer7 counter
-
-}
-
-void TIM7_IRQHandler(void) {
-
-	TIM7->SR &= ~1;
-
-	if (strstr(wifiCommunicationBuffer, "OK")) {
-		transferData();
-	}
-
-}
-
 void transferData(void) {
 	char current;
-	for (int i = 0; i < 3 * NUMLED; i++) { //add offset to buf
-		current = wifiCommunicationBuffer[i];
+	for (int i = 0; i < (3 * NUMLED); i++) { //add offset to buf
+		current = wifiCommunicationBuffer[i + 13];
 		for (int j = 0; j < 8; j++) {
-			if (current & (1 << j)) {
-				leds[i * 8 + j] = 38;
+			if ((current & (1 << j)) != 0) {
+				leds[(i * 8) + 7 - j] = 38;
 			} else {
-				leds[i * 8 + j] = 19;
+				leds[(i * 8) + 7 - j] = 19;
 			}
 		}
 	}
-	clear_buf(wifiCommunicationBuffer, 200);
+	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 }
 
 //////////////////////////////////////////////////
@@ -201,35 +186,35 @@ int main(void) {
 	char *buf;
 	buf = wifiCommunicationBuffer;
 
+
 	init_clock();
 
 	init_usart5();
-	writeString("\r\n");
-	writeString("AT+CWMODE=1\r\n");
 
 	enable_DMAinterrupt(wifiCommunicationBuffer, WifiCommBuffSIZE);
-	writeString("\r\n");
-	writeString("AT+CWMODE=1\r\n");
+
+
+	init_tim1_dma();
+
+	LED_alternate(leds, blue, red);
 
 	configureWifiSystem();
 
-//    init_tim7();
+	LED_alternate(leds, blue, green);
 
-	init_tim1_dma();
-	LED_alternate(leds, blue, blue);
 
 	int count = 0;
-	clear_buf(wifiCommunicationBuffer, 200);
+	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 
 //    while(1){
 //
 //    	if(count == 0 && strstr(wifiCommunicationBuffer, "g")){
 //    	  	LED_alternate(leds, green, green);
-//    	  	clear_buf(wifiCommunicationBuffer, 200);
+//    	  	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 //
 //    	}else if(count == 1000000 && strstr(wifiCommunicationBuffer, "IPD,0,3:b")){
 //    	   	LED_alternate(leds, blue, blue);
-//    	   	clear_buf(wifiCommunicationBuffer, 200);
+//    	   	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 //
 //    	} else if(count > 2000000) {
 //    		count = -1;
@@ -237,19 +222,27 @@ int main(void) {
 //    	count++;
 //
 // 	}
-	while (1) {
 
-		if (count == 0) {
-			LED_alternate(leds, green, red);
-
-		} else if (count == 1000000) {
-			LED_alternate(leds, red, green);
-
-		} else if (count > 2000000) {
-			count = -1;
-		}
-		count++;
+	while(1) {
+	    if(strstr(wifiCommunicationBuffer, "IPD,0,192:")) {
+	    	while(USART5->ISR & USART_ISR_BUSY);
+	    	transferData();
+	    }
 
 	}
-}
 
+//	while (1) {
+//
+//		if (count == 0) {
+//			LED_alternate(leds, green, red);
+//
+//		} else if (count == 1000000) {
+//			LED_alternate(leds, red, green);
+//
+//		} else if (count > 2000000) {
+//			count = -1;
+//		}
+//		count++;
+//
+//	}
+}
