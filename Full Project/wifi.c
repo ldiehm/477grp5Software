@@ -1,9 +1,10 @@
 #include "stm32f0xx.h"
 #include <stdio.h>
 #include <string.h>
+#include "wifi.h"
 
 #define WifiCommBuffSIZE 250
-extern char wifiCommunicationBuffer[WifiCommBuffSIZE];
+extern volatile char wifiCommunicationBuffer[WifiCommBuffSIZE];
 
 void init_usart5(void)
 {
@@ -39,10 +40,21 @@ void init_usart5(void)
     while(!(USART5->ISR & USART_ISR_TEACK) && !(USART5->ISR & USART_ISR_REACK));
 
 }
+//
+//void USART3_4_5_6_7_8_IRQHandler(void){
+//	int count = 0;
+//	while(wifiCommunicationBuffer[count] != 0){
+//		count++;
+//	}
+//	wifiCommunicationBuffer[count] = USART5->RDR;
+//}
 
 void enable_DMAinterrupt(char *buf, int size) {
 
-    USART5->CR1 |= USART_CR1_RXNEIE;
+    USART5->CR1 |= USART_CR1_RXNEIE | USART_CR1_RE;
+
+//	NVIC_EnableIRQ(USART3_8_IRQn);
+
     USART5->CR3 |= USART_CR3_DMAR;
 
     RCC->AHBENR |= RCC_AHBENR_DMA2EN;
@@ -82,6 +94,7 @@ void writeString(char * input) {
 //        while (!(USART5->ISR & USART_ISR_RXNE)) { }
 //        char c =  (USART5->RDR);
         while(!(USART5->ISR & USART_ISR_TXE)) { }
+        nano_wait(100);
         USART5->TDR = input[i];
 		i++;
     }
@@ -106,30 +119,34 @@ void configureWifi(char * SSID, char * pass){
 
 void configureWifiSystem(void){
 	writeString("\r\n");
-
+	int wait = 1000000;
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
+	//nano_wait(100000);
 	writeString("AT+CWMODE=1\r\n");
 
-	for(int i = 0; i < 1000000; i++);
-
+	//nano_wait(10000000000);
 	while(!strstr(wifiCommunicationBuffer, "OK"));
+	nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
+	//nano_wait(100000);
 	configureWifi("BOXFISH", "BOX");
+	//for(long long int i = 0; i < 20000000; i++);
+//	nano_wait(10000000000000);
 
 	while(!strstr(wifiCommunicationBuffer, "OK"));
-
+//	nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
+//	nano_wait(100000);
 	writeString("AT+CIPMUX=1\r\n");
-	for(int i = 0; i < 100000; i++);
-
+	nano_wait(100000);
 	while(!strstr(wifiCommunicationBuffer, "OK"));
-
+	nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
+	nano_wait(100000);
 	configureUDP("0.0.0.0");
-
-	for(int i = 0; i < 10000000; i++);
-
+	nano_wait(100000);
 	while(!strstr(wifiCommunicationBuffer, "OK") && !strstr(wifiCommunicationBuffer, "ERROR"));
+	nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 }
 
@@ -146,16 +163,43 @@ void configureUDP(char * IP){
 
 void clear_buf(char *buf, int size){
 
-	DMA2_Channel2->CCR &= ~DMA_CCR_EN;
 
 	for(int i = 0; i < size; i++){
-		buf[i] = 1;
+		buf[i] = 0;
 	}
+
+	DMA2_Channel2->CCR &= ~DMA_CCR_EN;
+
 
     DMA2_Channel2->CNDTR = WifiCommBuffSIZE;
 	DMA2_Channel2->CCR |= DMA_CCR_EN;
 }
 
+int match_string(char *str, char *substr, int len){
+	int count = 0;
+	char *b = substr;
+	char *a = str;
+	while(count < len){
+		if (*str != *b) {
+				str++;
+				count++;
+			    continue;
+		}
+		a = str;
+		while (1) {
+			if (*b == 0) {
+				return 1;
+			}
+			if (*a++ != *b++) {
+				break;
+			}
+		}
+		b = substr;
+		str++;
+		count++;
+	}
+	return 0;
+}
 
 //Long term problem - buf potentially circling to end of buffer w/ IP
 void getIP(char * IP, char * buf, int size){
