@@ -224,8 +224,8 @@ int main(void) {
 // 	}
 
 	while(1) {
-	    if(strstr(wifiCommunicationBuffer, "IPD,0,192:")) {
-	    	while(USART5->ISR & USART_ISR_BUSY);
+	    if(strstr(wifiCommunicationBuffer, "IPD,0,193:")) {
+	    	while(wifiCommunicationBuffer[205] != 'K');
 	    	transferData();
 	    }
 
