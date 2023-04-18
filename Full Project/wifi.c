@@ -66,7 +66,7 @@ void init_usart5(void)
     USART5->CR2 &= ~USART_CR1_PCE; //disabling parity
     USART5->CR1 &= ~USART_CR1_OVER8; // oversample of 16
 
-    USART5->BRR = 0x1A1; // 115.2k baud rate
+    USART5->BRR = 69; // 115.2k baud rate
     USART5->CR1 |= (USART_CR1_TE | USART_CR1_RE);
 
     //USART5->RTOR |= USART_RTOR_RTO;
