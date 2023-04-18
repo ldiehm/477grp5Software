@@ -6,8 +6,8 @@
 //constant definitions
 
 #define IPSIZE 16
-#define ONE (38)
-#define ZERO (19)
+#define ONE (7)
+#define ZERO (3)
 #define RS (0)
 #define NUMLED (64)
 #define LED_ARR_SIZE (24*NUMLED + 200)
@@ -28,19 +28,23 @@ void nano_wait(unsigned int n) {
 //BUFFER AT END FOR OFF CYCLE
 uint8_t leds[LED_ARR_SIZE] = { 0 };
 
-uint8_t off[24] = { 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-		19, 19, 19, 19, 19, 19, 19, 19, 19 };
-uint8_t red[24] = { 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 38, 38, 38,
-		38, 19, 19, 19, 19, 19, 19, 19, 19 };
-uint8_t green[24] = { 19, 19, 19, 19, 38, 38, 38, 38, 19, 19, 19, 19, 19, 19,
-		19, 19, 19, 19, 19, 19, 19, 19, 19, 19 };
-uint8_t blue[24] = { 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19,
-		19, 19, 19, 19, 19, 38, 38, 38, 38 };
-uint8_t white[24] = { 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38,
-		38, 38, 38, 38, 38, 38, 38, 38, 38, 38 };
-uint8_t reset[24] = { RS, RS, RS, RS, RS, RS, RS, RS,
-RS, RS, RS, RS, RS, RS, RS, RS,
-RS, RS, RS, RS, RS, RS, RS, RS };
+uint8_t off[24] = { ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO,
+		ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO };
+uint8_t red[24] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 7, 7, 7,
+		7, 3, 3, 3, 3, 3, 3, 3, 3 };
+//uint8_t red[24] = { ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ONE, ONE,
+//		ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO };
+uint8_t green[24] = { ZERO, ZERO, ZERO, ZERO, ONE, ONE, ONE, ONE, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO,
+		ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO };
+uint8_t blue[24] = { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+		3, 3, 3, 3, 3, 7, 7, 7, 7 };
+//uint8_t blue[24] = { ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO, ZERO,
+//		ZERO, ZERO, ZERO, ZERO, ZERO, ONE, ONE, ONE, ONE };
+uint8_t white[24] = { ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE,
+		ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE, ONE };
+//uint8_t reset[24] = { RS, RS, RS, RS, RS, RS, RS, RS,
+//RS, RS, RS, RS, RS, RS, RS, RS,
+//RS, RS, RS, RS, RS, RS, RS, RS };
 
 
 
@@ -124,7 +128,7 @@ void init_tim1_dma(void) {
 	TIM1->BDTR |= TIM_BDTR_MOE;
 
 	TIM1->PSC = 1 - 1;
-	TIM1->ARR = 60 - 1;
+	TIM1->ARR = 10 - 1;
 
 	TIM1->CR2 |= TIM_CR2_CCDS; //cc DMA selection
 	TIM1->DIER |= TIM_DIER_CC1DE | TIM_DIER_UDE | TIM_DIER_TDE; // CC 1 DMA request enable
@@ -146,7 +150,7 @@ void init_tim1_dma(void) {
 	DMA1_Channel2->CNDTR = (uint16_t) LED_ARR_SIZE; /* (5) */
 	DMA1_Channel2->CCR |= DMA_CCR_MINC | DMA_CCR_PSIZE_0 | DMA_CCR_TEIE
 			| DMA_CCR_TCIE; /* (6) */
-	DMA1_Channel2->CCR |= DMA_CCR_DIR;    // | DMA_CCR_CIRC;
+//	DMA1_Channel2->CCR |= DMA_CCR_DIR;    // | DMA_CCR_CIRC;
 	DMA1_Channel2->CCR |= DMA_CCR_DIR | DMA_CCR_CIRC;
 
 	TIM1->CR1 |= TIM_CR1_CEN;
@@ -200,9 +204,9 @@ void transferData(void) {
 		current = wifiCommunicationBuffer[i + 13];
 		for (int j = 0; j < 8; j++) {
 			if ((current & (1 << j)) != 0) {
-				leds[(i * 8) + 7 - j] = 38;
+				leds[(i * 8) + 7 - j] = ONE;
 			} else {
-				leds[(i * 8) + 7 - j] = 19;
+				leds[(i * 8) + 7 - j] = ZERO;
 			}
 		}
 	}
@@ -223,39 +227,39 @@ int main(void) {
 
 
 	//uint32_t clk = SystemCoreClock;
-	init_clock();
+//	init_clock();
 	GPIOC->ODR |= (1<<7) & ((RCC->CFGR & RCC_CFGR_SWS_1) << 4);
 	GPIOC->ODR |= 1<<8;
 
 	//clk = SystemCoreClock;
 	init_usart5();
-	while(1){
-	while(!(USART5->ISR & USART_ISR_TXE)) { }
-	        //nano_wait(100);
-			USART_SendData(USART5, 'J');
-//	        USART5->TDR = 'J';
-//	        USART_ClearFlag(USART5, USART_FLAG_TC);
-	    	GPIOC->ODR &= ~1<<7;
-//	        while(!(USART5->ISR & USART_ISR_TC));
-
-	}
-
-/*
+//	while(1){
+//	while(!(USART5->ISR & USART_ISR_TXE)) { }
+//	        //nano_wait(100);
+//			USART_SendData(USART5, 'J');
+////	        USART5->TDR = 'J';
+////	        USART_ClearFlag(USART5, USART_FLAG_TC);
+//	    	GPIOC->ODR &= ~1<<7;
+////	        while(!(USART5->ISR & USART_ISR_TC));
+//
+//	}
 	enable_DMAinterrupt(wifiCommunicationBuffer, WifiCommBuffSIZE);
-	//nano_wait(1000000);
 	init_tim1_dma();
-	//nano_wait(1000000);
+
 	LED_alternate(leds, blue, red);
-
-
 	configureWifiSystem();
+
+	//nano_wait(1000000);
+	//nano_wait(1000000);
+
+
 
 	LED_alternate(leds, blue, green);
 
 	int count = 0;
-	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
-*/
+//	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 
+	while(1);
 //    while(1){
 //
 //    	if(count == 0 && strstr(wifiCommunicationBuffer, "g")){
