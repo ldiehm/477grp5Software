@@ -6,6 +6,42 @@
 #define WifiCommBuffSIZE 250
 extern volatile char wifiCommunicationBuffer[WifiCommBuffSIZE];
 
+
+//void init_usart6(void)
+//{
+//
+//    RCC->AHBENR |= (RCC_AHBENR_GPIOAEN);
+//    GPIOA->MODER &= ~GPIO_MODER_MODER2;
+//    GPIOA->MODER |= GPIO_MODER_MODER2_1; //PA2 - USART6_TX
+//    GPIOA->MODER &= ~GPIO_MODER_MODER2;
+//    GPIOA->MODER |= GPIO_MODER_MODER3_1; //PA3 - USART6_RX
+//
+//    GPIOA->AFR[0] &= ~GPIO_AFRL_AFR2;
+//    GPIOA->AFR[0] |= 1 << (4 * 2);
+//
+//    GPIOA->AFR[0] &= ~GPIO_AFRL_AFR3;
+//    GPIOA->AFR[0] |= 1 << (4 * 3);
+//    //done with alternate function stuff
+//
+//    RCC->APB1ENR |= RCC_APB1ENR_USART5EN;
+//
+//    USART5->CR1 &= ~USART_CR1_UE; // disabling usart5 for time being
+//    USART5->CR1 &= ~(USART_CR1_M | 1 << 28);//(1<<12 | 1<<28); // word length of 8, making m0 and m1 0
+//    USART5->CR2 &= ~USART_CR2_STOP; //making stop bit of 1
+//    USART5->CR2 &= ~USART_CR1_PCE; //disabling parity
+//    USART5->CR1 &= ~USART_CR1_OVER8; // oversample of 16
+//
+//    USART5->BRR = 0x1A1; // 115.2k baud rate
+//    USART5->CR1 |= (USART_CR1_TE | USART_CR1_RE);
+//
+//    //USART5->RTOR |= USART_RTOR_RTO;
+//    USART5->CR1 |= USART_CR1_UE;
+//
+//    //waiting for receive enable acknowledge flag, Transmit enable acknowledge flag
+//    while(!(USART5->ISR & USART_ISR_TEACK) && !(USART5->ISR & USART_ISR_REACK));
+//
+//}
+
 void init_usart5(void)
 {
 
@@ -51,7 +87,7 @@ void init_usart5(void)
 
 void enable_DMAinterrupt(char *buf, int size) {
 
-    USART5->CR1 |= USART_CR1_RXNEIE | USART_CR1_RE;
+    USART5->CR1 |= USART_CR1_RXNEIE;// | USART_CR1_RE;
 
 //	NVIC_EnableIRQ(USART3_8_IRQn);
 
@@ -93,11 +129,13 @@ void writeString(char * input) {
 	while(input[i] != '\0'){
 //        while (!(USART5->ISR & USART_ISR_RXNE)) { }
 //        char c =  (USART5->RDR);
+
         while(!(USART5->ISR & USART_ISR_TXE)) { }
-        nano_wait(100);
+        //nano_wait(100);
         USART5->TDR = input[i];
 		i++;
     }
+		//GPIOC->ODR |= 1 << 7;
 }
 
 void disconnectWifi(void){
@@ -118,15 +156,23 @@ void configureWifi(char * SSID, char * pass){
 }
 
 void configureWifiSystem(void){
+
+
 	writeString("\r\n");
-	int wait = 1000000;
+	//int wait = 1000000;
+
+
+
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 	//nano_wait(100000);
+
+
+
 	writeString("AT+CWMODE=1\r\n");
 
 	//nano_wait(10000000000);
 	while(!strstr(wifiCommunicationBuffer, "OK"));
-	nano_wait(100000);
+	//nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 	//nano_wait(100000);
 	configureWifi("BOXFISH", "BOX");
@@ -138,15 +184,15 @@ void configureWifiSystem(void){
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 //	nano_wait(100000);
 	writeString("AT+CIPMUX=1\r\n");
-	nano_wait(100000);
+	//nano_wait(100000);
 	while(!strstr(wifiCommunicationBuffer, "OK"));
-	nano_wait(100000);
+	//nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
-	nano_wait(100000);
+	//nano_wait(100000);
 	configureUDP("0.0.0.0");
-	nano_wait(100000);
+	//nano_wait(100000);
 	while(!strstr(wifiCommunicationBuffer, "OK") && !strstr(wifiCommunicationBuffer, "ERROR"));
-	nano_wait(100000);
+	//nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 }
 
