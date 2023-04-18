@@ -13,12 +13,15 @@
 #define LED_ARR_SIZE (24*NUMLED + 200)
 #define WifiCommBuffSIZE (250)
 
+
+
+
 volatile char wifiCommunicationBuffer[WifiCommBuffSIZE];
 int count = 0;
 
 void nano_wait(unsigned int n) {
 	asm( "        mov r0,%0\n"
-			"repeat: sub r0,#83\n"
+			"repeat2: sub r0,#83\n"
 			"        bgt repeat\n" : : "r"(n) : "r0", "cc");
 }
 
@@ -39,6 +42,9 @@ uint8_t reset[24] = { RS, RS, RS, RS, RS, RS, RS, RS,
 RS, RS, RS, RS, RS, RS, RS, RS,
 RS, RS, RS, RS, RS, RS, RS, RS };
 
+
+
+
 void init_clock(void) {
 
 
@@ -57,21 +63,45 @@ void init_clock(void) {
 //	      pllsource = RCC->CFGR & RCC_CFGR_PLLSRC;
 //	      pllmull = ( pllmull >> 18) + 2;
 
+	//disable pll by pllon 0
+	//wait until
+	RCC->CR &= (uint32_t)(~RCC_CR_PLLON);/* (4) */
+	while((RCC->CR & RCC_CR_PLLRDY) != 0); /* (5) */
+
 	RCC->CFGR |= RCC_CFGR_PLLMUL6;
 	RCC->CFGR2 &= ~0xF; // Clears lowest 4 bits of CFGR2 (PREDIV)
 	RCC->CFGR |= RCC_CFGR_PLLSRC_0;
 	RCC->CR |= RCC_CR_PLLON;
+//	RCC->CFGR &= ~(0x/3);
+	int count = 0;
+
+	while(!(RCC->CR & RCC_CR_PLLRDY))
+	{
+	 break;
+	}
+	GPIOC->ODR |= 1<<7;
+
+//	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
+	//uint8_t clksrc = RCC_GetSYSCLKSource();
+	//GPIOC->ODR |= 1<<8;
+	/* Clear SW[1:0] bits */
+	  RCC->CFGR &= ~RCC_CFGR_SW;
+
+	  /* Set SW[1:0] bits according to RCC_SYSCLKSource value */
+	  RCC->CFGR |= RCC_SYSCLKSource_PLLCLK;
+
+	count = 0;
+	GPIOC->ODR |= 1<<7;
+	while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL){
+	 break;
+	}
+	GPIOC->ODR |= 1<<8;
 
 
-
-	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-	uint8_t clksrc = RCC_GetSYSCLKSource();
-	//RCC_ClocksTypeDef * clk;
-	//RCC_GetClocksFreq(clk); <- this infinite loops
-
-
+	SystemCoreClockUpdate();
 //	RCC_PLLConfig(RCC_PLLSource_HSI, RCC_CFGR_PLLMUL_2);
 
+//	RCC->CFGR |= 0x3;
 	return;
 
 }
@@ -185,16 +215,36 @@ int main(void) {
 
 	char *buf;
 	buf = wifiCommunicationBuffer;
+	RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
 
-	uint32_t clk = SystemCoreClock;
+	GPIOC->MODER |= 1<< 16 | 1 << 14;
+	//GPIOC->ODR |= 1<<7;
+
+
+
+	//uint32_t clk = SystemCoreClock;
 	init_clock();
-	clk = SystemCoreClock;
+	GPIOC->ODR |= (1<<7) & ((RCC->CFGR & RCC_CFGR_SWS_1) << 4);
+	GPIOC->ODR |= 1<<8;
+
+	//clk = SystemCoreClock;
 	init_usart5();
+	while(1){
+	while(!(USART5->ISR & USART_ISR_TXE)) { }
+	        //nano_wait(100);
+			USART_SendData(USART5, 'J');
+//	        USART5->TDR = 'J';
+//	        USART_ClearFlag(USART5, USART_FLAG_TC);
+	    	GPIOC->ODR &= ~1<<7;
+//	        while(!(USART5->ISR & USART_ISR_TC));
 
+	}
+
+/*
 	enable_DMAinterrupt(wifiCommunicationBuffer, WifiCommBuffSIZE);
-
+	//nano_wait(1000000);
 	init_tim1_dma();
-
+	//nano_wait(1000000);
 	LED_alternate(leds, blue, red);
 
 
@@ -202,9 +252,9 @@ int main(void) {
 
 	LED_alternate(leds, blue, green);
 
-
 	int count = 0;
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
+*/
 
 //    while(1){
 //
