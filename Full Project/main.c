@@ -83,7 +83,6 @@ void init_clock(void) {
 	{
 	 break;
 	}
-	GPIOC->ODR |= 1<<7;
 
 //	RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
 	//uint8_t clksrc = RCC_GetSYSCLKSource();
@@ -95,11 +94,9 @@ void init_clock(void) {
 	  RCC->CFGR |= RCC_SYSCLKSource_PLLCLK;
 
 	count = 0;
-	GPIOC->ODR |= 1<<7;
 	while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL){
 	 break;
 	}
-	GPIOC->ODR |= 1<<8;
 
 
 	SystemCoreClockUpdate();
@@ -218,18 +215,25 @@ void transferData(void) {
 int main(void) {
 
 	char *buf;
+
+	volatile int i;
+
+	for(i = 0; i < 1000000; i++){
+	    asm("nop");
+	}
+
 	buf = wifiCommunicationBuffer;
 	RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
 
 	GPIOC->MODER |= 1<< 16 | 1 << 14;
-	//GPIOC->ODR |= 1<<7;
-
+	GPIOC->ODR |= 1<<7;
+	GPIOC->ODR |= 1<<8;
 
 
 	//uint32_t clk = SystemCoreClock;
 //	init_clock();
-	GPIOC->ODR |= (1<<7) & ((RCC->CFGR & RCC_CFGR_SWS_1) << 4);
-	GPIOC->ODR |= 1<<8;
+//	GPIOC->ODR |= (1<<7) & ((RCC->CFGR & RCC_CFGR_SWS_1) << 4);
+//	GPIOC->ODR |= 1<<8;
 
 	//clk = SystemCoreClock;
 	init_usart5();
@@ -247,6 +251,7 @@ int main(void) {
 	init_tim1_dma();
 
 	LED_alternate(leds, blue, red);
+
 	configureWifiSystem();
 
 	//nano_wait(1000000);
@@ -256,10 +261,12 @@ int main(void) {
 
 	LED_alternate(leds, blue, green);
 
+	GPIOC->ODR |= 1<<7;
+
 	int count = 0;
 //	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 
-	while(1);
+// 	while(1);
 //    while(1){
 //
 //    	if(count == 0 && strstr(wifiCommunicationBuffer, "g")){
@@ -278,7 +285,7 @@ int main(void) {
 // 	}
 
 	while(1) {
-	    if(strstr(wifiCommunicationBuffer, "IPD,0,193:")) {
+  	    if(strstr(wifiCommunicationBuffer, "IPD,0,193:")) {
 	    	while(wifiCommunicationBuffer[205] != 'K');
 	    	transferData();
 	    }

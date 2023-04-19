@@ -171,7 +171,13 @@ void configureWifiSystem(void){
 	writeString("AT+CWMODE=1\r\n");
 
 	//nano_wait(10000000000);
-	while(!strstr(wifiCommunicationBuffer, "OK"));
+	volatile int i = 0;
+	while(!strstr(wifiCommunicationBuffer, "OK")){
+	    i++;
+	    if((i % 500) == 0) {
+		writeString("AT+CWMODE=1\r\n");
+	    }
+	}
 	//nano_wait(100000);
 	clear_buf(wifiCommunicationBuffer, WifiCommBuffSIZE);
 	//nano_wait(100000);
