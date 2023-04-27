@@ -236,6 +236,7 @@ int main(void) {
 //	GPIOC->ODR |= 1<<8;
 
 	//clk = SystemCoreClock;
+
 	init_usart5();
 //	while(1){
 //	while(!(USART5->ISR & USART_ISR_TXE)) { }
